@@ -1,0 +1,1 @@
+print("meu mod é",20 % 9)
