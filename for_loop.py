@@ -51,4 +51,32 @@ dic_produtos = {"arroz": 20, "feijão": 10, "macarrão": 5, "farinha": 2}
 #if 50 in dic_produtos.values():
 #    print("Existe")
 #else:
+
 #    print("Não existe")
+
+# EXEMPLO 3
+
+nome_produto = input("Nome do produto: ")
+preco_produto = input("Preço do produto: ")
+
+#cadastrar o novo produto(se o produto não existir)
+#caso o produto exista, ele vai editar o produto
+nome_produto = nome_produto.lower()
+preco_produto = int(preco_produto)
+
+dic_produtos[nome_produto] = preco_produto
+print(dic_produtos)
+
+#além disso, o programa ter que atualizar preço de todos os produtos para novos valores em 10% a mais do que o preço original
+produto = "arroz"
+novo_preco = dic_produtos[produto] * 1.1
+dic_produtos[produto] = novo_preco
+print(dic_produtos)
+
+#alterar todos os preços da lista
+
+for produto in dic_produtos:
+    novo_preco = dic_produtos[produto] * 1.1
+    dic_produtos[produto] = novo_preco
+    
+print(dic_produtos)
