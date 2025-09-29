@@ -218,8 +218,4 @@ def desenhar_tela (tela, passaros, canos, chao, pontos):
                     passaro.pop(i)
                     
             desenhar_tela(tela, passaros, canos, chao, pontos)
-            
-            
-            
-            desenhar_tela(tela, )
-        
+
