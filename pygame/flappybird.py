@@ -4,15 +4,15 @@ import random
 
 # --- CÓDIGO CORRIGIDO E DEFINITIVO ---
 
-
 diretorio_base = os.path.dirname(os.path.abspath(__file__))
 caminho_imgs = os.path.join(diretorio_base, 'imgs')
 
-
 TELA_LARGURA = 500
 TELA_ALTURA = 800
+### NOVO: Nome do arquivo que guardará o recorde ###
+ARQUIVO_RECORDE = "highscore.txt"
 
-# Agora, carregue todas as imagens usando a variável 'caminho_imgs'
+# Carregamento de imagens
 IMAGEM_CANO = pygame.transform.scale2x(pygame.image.load(os.path.join(caminho_imgs, 'pipe.png')))
 IMAGEM_CHAO = pygame.transform.scale2x(pygame.image.load(os.path.join(caminho_imgs, 'base.png')))
 IMAGEM_BACKGROUND = pygame.transform.scale2x(pygame.image.load(os.path.join(caminho_imgs, 'bg.png')))
@@ -25,11 +25,28 @@ IMAGENS_PASSARO = [
 # --- FONTES DO JOGO ---
 pygame.font.init()
 FONTE_PONTOS = pygame.font.SysFont('arial', 50)
-### NOVO: Fontes para a tela de Game Over ###
 FONTE_GAMEOVER = pygame.font.SysFont('arial', 80, bold=True)
 FONTE_REINICIAR = pygame.font.SysFont('arial', 30)
+FONTE_FPS = pygame.font.SysFont('arial', 25)
+
+### NOVO: Função para ler o recorde do arquivo ###
+def ler_recorde():
+    """Lê o recorde de um arquivo. Retorna 0 se o arquivo não existir."""
+    try:
+        with open(ARQUIVO_RECORDE, 'r') as f:
+            return int(f.read())
+    except (FileNotFoundError, ValueError):
+        # Se o arquivo não existe ou está vazio/corrompido, o recorde é 0
+        return 0
+
+### NOVO: Função para salvar o novo recorde no arquivo ###
+def salvar_recorde(novo_recorde):
+    """Salva um novo recorde no arquivo."""
+    with open(ARQUIVO_RECORDE, 'w') as f:
+        f.write(str(novo_recorde))
 
 
+# ... (O restante das classes Passaro, Cano, Chao continuam exatamente iguais) ...
 class Passaro:
     IMGS = IMAGENS_PASSARO
     ROTACAO_MAXIMA = 25
@@ -162,34 +179,47 @@ class Chao:
         tela.blit(self.IMAGEM, (self.x1, self.y))
         tela.blit(self.IMAGEM, (self.x2, self.y))
 
-def desenhar_tela(tela, passaros, canos, chao, pontos):
+
+def desenhar_tela(tela, passaros, canos, chao, pontos, relogio):
     tela.blit(IMAGEM_BACKGROUND, (0, 0))
     for passaro in passaros:
         passaro.desenhar(tela)
     for cano in canos:
         cano.desenhar(tela)
 
-    texto = FONTE_PONTOS.render(f"Pontuação: {pontos}", 1, (255, 255, 255))
-    tela.blit(texto, (TELA_LARGURA - 10 - texto.get_width(), 10))
+    # Pontuação
+    texto_pontos = FONTE_PONTOS.render(f"Pontuação: {pontos}", 1, (255, 255, 255))
+    tela.blit(texto_pontos, (TELA_LARGURA - 10 - texto_pontos.get_width(), 10))
+
+    # FPS
+    fps = relogio.get_fps()
+    texto_fps = FONTE_FPS.render(f"FPS: {int(fps)}", 1, (255, 255, 0))
+    tela.blit(texto_fps, (10, 10))
+
     chao.desenhar(tela)
     pygame.display.update()
 
-### NOVO: Função para exibir a tela de Game Over ###
-def tela_game_over(tela, pontos):
-    # Desenha o texto "GAME OVER"
-    texto_gameover = FONTE_GAMEOVER.render("GAME OVER", 1, (255, 0, 0)) # Vermelho
+### ALTERADO: Adicionado 'recorde' como parâmetro ###
+def tela_game_over(tela, pontos, recorde):
+    # Texto "GAME OVER"
+    texto_gameover = FONTE_GAMEOVER.render("GAME OVER", 1, (255, 0, 0))
     pos_x_go = TELA_LARGURA/2 - texto_gameover.get_width()/2
     pos_y_go = TELA_ALTURA/2 - 100
     tela.blit(texto_gameover, (pos_x_go, pos_y_go))
 
-    # Desenha o texto da pontuação final
+    # Pontuação final
     texto_pontos = FONTE_PONTOS.render(f"Pontuação: {pontos}", 1, (255, 255, 255))
     pos_x_pts = TELA_LARGURA/2 - texto_pontos.get_width()/2
-    pos_y_pts = TELA_ALTURA/2
+    pos_y_pts = TELA_ALTURA/2 - 20 # Posição um pouco mais para cima
     tela.blit(texto_pontos, (pos_x_pts, pos_y_pts))
 
+    ### NOVO: Desenha o recorde na tela ###
+    texto_recorde = FONTE_REINICIAR.render(f"Recorde: {recorde}", 1, (255, 255, 0)) # Cor amarela
+    pos_x_rec = TELA_LARGURA/2 - texto_recorde.get_width()/2
+    pos_y_rec = TELA_ALTURA/2 + 30 # Posição abaixo da pontuação
+    tela.blit(texto_recorde, (pos_x_rec, pos_y_rec))
 
-    # Desenha o botão/texto para reiniciar
+    # Texto para reiniciar
     texto_reiniciar = FONTE_REINICIAR.render("Pressione R para reiniciar", 1, (255, 255, 255))
     pos_x_re = TELA_LARGURA/2 - texto_reiniciar.get_width()/2
     pos_y_re = TELA_ALTURA/2 + 80
@@ -197,7 +227,7 @@ def tela_game_over(tela, pontos):
 
     pygame.display.update()
 
-    # Loop que espera o jogador decidir o que fazer
+    # Loop de espera
     esperando = True
     while esperando:
         for evento in pygame.event.get():
@@ -205,11 +235,10 @@ def tela_game_over(tela, pontos):
                 pygame.quit()
                 quit()
             if evento.type == pygame.KEYDOWN:
-                if evento.key == pygame.K_r: # Se a tecla 'R' for pressionada
-                    esperando = False # Sai do loop para reiniciar o jogo
+                if evento.key == pygame.K_r:
+                    esperando = False
 
 
-### ALTERADO: A antiga função 'main' foi renomeada para 'rodar_jogo' ###
 def rodar_jogo(tela):
     passaros = [Passaro(230, 350)]
     chao = Chao(730)
@@ -261,27 +290,33 @@ def rodar_jogo(tela):
             if (passaro.y + passaro.imagem.get_height()) > chao.y or passaro.y < 0:
                 passaros.pop(i)
 
-        ### NOVO: Condição de Fim de Jogo ###
-        # Se a lista de pássaros estiver vazia, o jogo acabou.
         if len(passaros) == 0:
-            rodando = False # Para o loop do jogo
+            rodando = False
 
-        desenhar_tela(tela, passaros, canos, chao, pontos)
+        desenhar_tela(tela, passaros, canos, chao, pontos, relogio)
 
-    # ### ALTERADO: Retorna a pontuação final para a função principal ###
     return pontos
 
 
-### NOVO: A nova função 'main' que controla o fluxo do programa ###
+### ALTERADO: Lógica principal para lidar com o recorde ###
 def main():
     tela = pygame.display.set_mode((TELA_LARGURA, TELA_ALTURA))
     pygame.display.set_caption("Flappy Bird")
 
-    while True: # Loop principal do programa
-        pontos_finais = rodar_jogo(tela) # Inicia uma partida
-        tela_game_over(tela, pontos_finais) # Quando a partida acaba, mostra a tela de Game Over
+    # Carrega o recorde salvo no início do programa
+    recorde = ler_recorde()
+
+    while True:
+        pontos_finais = rodar_jogo(tela)
+
+        # Verifica se um novo recorde foi alcançado
+        if pontos_finais > recorde:
+            recorde = pontos_finais
+            salvar_recorde(recorde)
+
+        # Passa o recorde para a tela de Game Over
+        tela_game_over(tela, pontos_finais, recorde)
 
 
 if __name__ == '__main__':
-
     main()
