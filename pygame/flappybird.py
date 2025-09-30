@@ -4,11 +4,7 @@ import random
 
 # --- CÓDIGO CORRIGIDO E DEFINITIVO ---
 
-# Pega o caminho completo da pasta onde o script (flappybird.py) está
-# NOTA: Se você estiver rodando no VSCode ou similar, pode ser que __file__ não funcione
-# como esperado. Uma alternativa mais simples, se as imagens estiverem em uma pasta 'imgs'
-# ao lado do seu script é usar apenas 'imgs'.
-# caminho_imgs = 'imgs'
+
 diretorio_base = os.path.dirname(os.path.abspath(__file__))
 caminho_imgs = os.path.join(diretorio_base, 'imgs')
 
@@ -287,4 +283,5 @@ def main():
 
 
 if __name__ == '__main__':
+
     main()
