@@ -1,54 +1,32 @@
 import pygame
 import os
 import random
+import neat
 
-# --- CÓDIGO CORRIGIDO E DEFINITIVO ---
-
-diretorio_base = os.path.dirname(os.path.abspath(__file__))
-caminho_imgs = os.path.join(diretorio_base, 'imgs')
+ai_jogando = True
+geracao = 0
 
 TELA_LARGURA = 500
 TELA_ALTURA = 800
-### NOVO: Nome do arquivo que guardará o recorde ###
-ARQUIVO_RECORDE = "highscore.txt"
 
-# Carregamento de imagens
-IMAGEM_CANO = pygame.transform.scale2x(pygame.image.load(os.path.join(caminho_imgs, 'pipe.png')))
-IMAGEM_CHAO = pygame.transform.scale2x(pygame.image.load(os.path.join(caminho_imgs, 'base.png')))
-IMAGEM_BACKGROUND = pygame.transform.scale2x(pygame.image.load(os.path.join(caminho_imgs, 'bg.png')))
+IMAGEM_CANO = pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'pipe.png')))
+IMAGEM_CHAO = pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'base.png')))
+IMAGEM_BACKGROUND = pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'bg.png')))
 IMAGENS_PASSARO = [
-    pygame.transform.scale2x(pygame.image.load(os.path.join(caminho_imgs, 'bird1.png'))),
-    pygame.transform.scale2x(pygame.image.load(os.path.join(caminho_imgs, 'bird2.png'))),
-    pygame.transform.scale2x(pygame.image.load(os.path.join(caminho_imgs, 'bird3.png')))
+    pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'bird1.png'))),
+    pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'bird2.png'))),
+    pygame.transform.scale2x(pygame.image.load(os.path.join('imgs', 'bird3.png'))),
 ]
 
-# --- FONTES DO JOGO ---
+# Fonte para exibir a pontuação
 pygame.font.init()
-FONTE_PONTOS = pygame.font.SysFont('arial', 50)
-FONTE_GAMEOVER = pygame.font.SysFont('arial', 80, bold=True)
-FONTE_REINICIAR = pygame.font.SysFont('arial', 30)
-FONTE_FPS = pygame.font.SysFont('arial', 25)
-
-### NOVO: Função para ler o recorde do arquivo ###
-def ler_recorde():
-    """Lê o recorde de um arquivo. Retorna 0 se o arquivo não existir."""
-    try:
-        with open(ARQUIVO_RECORDE, 'r') as f:
-            return int(f.read())
-    except (FileNotFoundError, ValueError):
-        # Se o arquivo não existe ou está vazio/corrompido, o recorde é 0
-        return 0
-
-### NOVO: Função para salvar o novo recorde no arquivo ###
-def salvar_recorde(novo_recorde):
-    """Salva um novo recorde no arquivo."""
-    with open(ARQUIVO_RECORDE, 'w') as f:
-        f.write(str(novo_recorde))
+FONTE_PONTOS = pygame.font.SysFont("arial", 50)
+FONTE_GAME_OVER = pygame.font.SysFont("arial", 60, bold=True)
 
 
-# ... (O restante das classes Passaro, Cano, Chao continuam exatamente iguais) ...
 class Passaro:
     IMGS = IMAGENS_PASSARO
+    # animações da rotação
     ROTACAO_MAXIMA = 25
     VELOCIDADE_ROTACAO = 20
     TEMPO_ANIMACAO = 5
@@ -69,9 +47,11 @@ class Passaro:
         self.altura = self.y
 
     def mover(self):
+        # calcular o deslocamento
         self.tempo += 1
-        deslocamento = self.velocidade * self.tempo + 1.5 * (self.tempo**2)
+        deslocamento = 1.5 * (self.tempo**2) + self.velocidade * self.tempo
 
+        # restringir o deslocamento
         if deslocamento > 16:
             deslocamento = 16
         elif deslocamento < 0:
@@ -79,7 +59,8 @@ class Passaro:
 
         self.y += deslocamento
 
-        if deslocamento < 0 or self.y < self.altura + 50:
+        # o angulo do passaro
+        if deslocamento < 0 or self.y < (self.altura + 50):
             if self.angulo < self.ROTACAO_MAXIMA:
                 self.angulo = self.ROTACAO_MAXIMA
         else:
@@ -87,6 +68,7 @@ class Passaro:
                 self.angulo -= self.VELOCIDADE_ROTACAO
 
     def desenhar(self, tela):
+        # definir qual imagem do passaro vai usar
         self.contagem_imagem += 1
 
         if self.contagem_imagem < self.TEMPO_ANIMACAO:
@@ -101,10 +83,13 @@ class Passaro:
             self.imagem = self.IMGS[0]
             self.contagem_imagem = 0
 
+
+        # se o passaro tiver caindo eu não vou bater asa
         if self.angulo <= -80:
             self.imagem = self.IMGS[1]
             self.contagem_imagem = self.TEMPO_ANIMACAO*2
 
+        # desenhar a imagem
         imagem_rotacionada = pygame.transform.rotate(self.imagem, self.angulo)
         pos_centro_imagem = self.imagem.get_rect(topleft=(self.x, self.y)).center
         retangulo = imagem_rotacionada.get_rect(center=pos_centro_imagem)
@@ -156,6 +141,7 @@ class Cano:
         else:
             return False
 
+
 class Chao:
     VELOCIDADE = 5
     LARGURA = IMAGEM_CHAO.get_width()
@@ -180,54 +166,35 @@ class Chao:
         tela.blit(self.IMAGEM, (self.x2, self.y))
 
 
-def desenhar_tela(tela, passaros, canos, chao, pontos, relogio):
+def desenhar_tela(tela, passaros, canos, chao, pontos):
     tela.blit(IMAGEM_BACKGROUND, (0, 0))
     for passaro in passaros:
         passaro.desenhar(tela)
     for cano in canos:
         cano.desenhar(tela)
 
-    # Pontuação
-    texto_pontos = FONTE_PONTOS.render(f"Pontuação: {pontos}", 1, (255, 255, 255))
-    tela.blit(texto_pontos, (TELA_LARGURA - 10 - texto_pontos.get_width(), 10))
-
-    # FPS
-    fps = relogio.get_fps()
-    texto_fps = FONTE_FPS.render(f"FPS: {int(fps)}", 1, (255, 255, 0))
-    tela.blit(texto_fps, (10, 10))
-
+    texto = FONTE_PONTOS.render(f"Pontuação: {pontos}", 1, (255, 255, 255))
+    tela.blit(texto, (TELA_LARGURA - 10 - texto.get_width(), 10))
+    
+    if ai_jogando:
+        texto = FONTE_PONTOS.render(f"Geração: {geracao}", 1, (255, 255, 255))
+        tela.blit(texto, (10, 10))
+    
     chao.desenhar(tela)
     pygame.display.update()
 
-### ALTERADO: Adicionado 'recorde' como parâmetro ###
-def tela_game_over(tela, pontos, recorde):
-    # Texto "GAME OVER"
-    texto_gameover = FONTE_GAMEOVER.render("GAME OVER", 1, (255, 0, 0))
-    pos_x_go = TELA_LARGURA/2 - texto_gameover.get_width()/2
-    pos_y_go = TELA_ALTURA/2 - 100
-    tela.blit(texto_gameover, (pos_x_go, pos_y_go))
+# Tela de Game Over
+def game_over(tela, pontos):
+    texto_game_over = FONTE_GAME_OVER.render("GAME OVER", 1, (255, 0, 0))
+    texto_restart = FONTE_PONTOS.render("Pressione ESPAÇO", 1, (255, 255, 255))
 
-    # Pontuação final
-    texto_pontos = FONTE_PONTOS.render(f"Pontuação: {pontos}", 1, (255, 255, 255))
-    pos_x_pts = TELA_LARGURA/2 - texto_pontos.get_width()/2
-    pos_y_pts = TELA_ALTURA/2 - 20 # Posição um pouco mais para cima
-    tela.blit(texto_pontos, (pos_x_pts, pos_y_pts))
-
-    ### NOVO: Desenha o recorde na tela ###
-    texto_recorde = FONTE_REINICIAR.render(f"Recorde: {recorde}", 1, (255, 255, 0)) # Cor amarela
-    pos_x_rec = TELA_LARGURA/2 - texto_recorde.get_width()/2
-    pos_y_rec = TELA_ALTURA/2 + 30 # Posição abaixo da pontuação
-    tela.blit(texto_recorde, (pos_x_rec, pos_y_rec))
-
-    # Texto para reiniciar
-    texto_reiniciar = FONTE_REINICIAR.render("Pressione R para reiniciar", 1, (255, 255, 255))
-    pos_x_re = TELA_LARGURA/2 - texto_reiniciar.get_width()/2
-    pos_y_re = TELA_ALTURA/2 + 80
-    tela.blit(texto_reiniciar, (pos_x_re, pos_y_re))
+    tela.blit(
+        texto_game_over, (TELA_LARGURA / 2 - texto_game_over.get_width() / 2, 200)
+    )
+    tela.blit(texto_restart, (TELA_LARGURA / 2 - texto_restart.get_width() / 2, 300))
 
     pygame.display.update()
 
-    # Loop de espera
     esperando = True
     while esperando:
         for evento in pygame.event.get():
@@ -235,14 +202,28 @@ def tela_game_over(tela, pontos, recorde):
                 pygame.quit()
                 quit()
             if evento.type == pygame.KEYDOWN:
-                if evento.key == pygame.K_r:
+                if evento.key == pygame.K_SPACE:
                     esperando = False
 
-
-def rodar_jogo(tela):
+def main(genomas, config):
+    global geracao
+    geracao += 1
+    
+    if ai_jogando:
+        redes = []
+        lista_genomas = []
+        passaros = []
+        for _, genoma in genomas:
+            rede = neat.nn.FeedForwardNetwork.create(genoma, config)
+            redes.append(rede)
+            genoma.fitness = 0
+            lista_genomas.append(rede)
+            passaros.append(Passaro(230, 350))
+    
     passaros = [Passaro(230, 350)]
     chao = Chao(730)
     canos = [Cano(700)]
+    tela = pygame.display.set_mode((TELA_LARGURA, TELA_ALTURA))
     pontos = 0
     relogio = pygame.time.Clock()
 
@@ -250,19 +231,35 @@ def rodar_jogo(tela):
     while rodando:
         relogio.tick(30)
 
+        # interação com o usuário
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT:
                 rodando = False
                 pygame.quit()
                 quit()
-            if evento.type == pygame.KEYDOWN:
-                if evento.key == pygame.K_SPACE:
-                    for passaro in passaros:
-                        passaro.pular()
-
-        # Mover as coisas no jogo
-        for passaro in passaros:
+            if not ai_jogando:
+                if evento.type == pygame.KEYDOWN:
+                    if evento.key == pygame.K_SPACE:
+                        for passaro in passaros:
+                            passaro.pular()
+        
+        indice_cano = 0
+        if len(passaros) > 0:
+            if len(canos) > 1 and passaros[0].x > (canos[0].x + canos[0].CANO_TOPO.get_width()):
+                indice_cano = 1
+        else: 
+            rodando = False
+            break
+        
+        # mover as coisas
+        for i, passaro in enumerate(passaros):
             passaro.mover()
+            lista_genomas[i].fitness += 0.1
+            output = redes[i].activate((passaro.y, 
+                                        abs(passaro.y - canos [indice_cano].altura),
+                                        abs(passaro.y - canos[indice_cano].pos_base)))
+            if output[0] > 0.5:
+                passaro.pular()
         chao.mover()
 
         adicionar_cano = False
@@ -270,11 +267,22 @@ def rodar_jogo(tela):
         for cano in canos:
             for i, passaro in enumerate(passaros):
                 if cano.colidir(passaro):
-                    passaros.pop(i)
+                    if ai_jogando:
+                        lista_genomas[i].fitness -= 1
+                        lista_genomas.pop(i)
+                        redes.pop(i)
                 if not cano.passou and passaro.x > cano.x:
                     cano.passou = True
                     adicionar_cano = True
-
+                    
+                    
+                    game_over(tela, pontos)  # mostra tela de game over
+                    main()  # reinicia o jogo
+                        
+                if not cano.passou and passaro.x > cano.x:
+                    cano.passou = True
+                    adicionar_cano = True
+                    
             cano.mover()
             if cano.x + cano.CANO_TOPO.get_width() < 0:
                 remover_canos.append(cano)
@@ -282,41 +290,37 @@ def rodar_jogo(tela):
         if adicionar_cano:
             pontos += 1
             canos.append(Cano(600))
-
+            for genoma in lista_genomas:
+                genoma.fitness =+ 5
         for cano in remover_canos:
             canos.remove(cano)
 
         for i, passaro in enumerate(passaros):
             if (passaro.y + passaro.imagem.get_height()) > chao.y or passaro.y < 0:
                 passaros.pop(i)
+                if ai_jogando:
+                    lista_genomas.pop(i)
+                    redes.pop
 
-        if len(passaros) == 0:
-            rodando = False
-
-        desenhar_tela(tela, passaros, canos, chao, pontos, relogio)
-
-    return pontos
-
-
-### ALTERADO: Lógica principal para lidar com o recorde ###
-def main():
-    tela = pygame.display.set_mode((TELA_LARGURA, TELA_ALTURA))
-    pygame.display.set_caption("Flappy Bird")
-
-    # Carrega o recorde salvo no início do programa
-    recorde = ler_recorde()
-
-    while True:
-        pontos_finais = rodar_jogo(tela)
-
-        # Verifica se um novo recorde foi alcançado
-        if pontos_finais > recorde:
-            recorde = pontos_finais
-            salvar_recorde(recorde)
-
-        # Passa o recorde para a tela de Game Over
-        tela_game_over(tela, pontos_finais, recorde)
-
-
-if __name__ == '__main__':
-    main()
+        desenhar_tela(tela, passaros, canos, chao, pontos)
+        
+        
+def rodar(caminho_config):
+    config = neat.config.Config(neat.DefaultGenome,
+                                neat.DefaultReproduction,
+                                neat.DefaultSpecoesSet,
+                                neat.DefaultStagmation,
+                                caminho_config)
+                                
+    populacao = neat.population(config)
+    populacao.run(main)
+    if ai_jogando:
+        populacao.run(main, 50)
+    else:
+        main(None, None)
+    
+    if __name__ == '__main__':
+        caminho = os.path.dirname(__file__)
+        caminho_config = os.path.join(caminho, 'config.txt')
+        rodar(caminho_config)
+        main()
